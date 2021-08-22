@@ -59,6 +59,13 @@ class NHLSeasonScraper():
                         player_dict = site_json.get("stats")[0].get('splits')[0].get("stat")
                         player_dict['id'] = player['person']['id']
                         player_dict['name'] = player['person']['fullName']
+                        
+                        url = "https://statsapi.web.nhl.com/api/v1/people/" + str(player_dict['id'])
+                        html = request.urlopen(url).read()
+                        soup = BS(html,'html.parser')
+                        site_json=json.loads(soup.text)
+                        player_dict['position'] = site_json.get('people')[0].get("primaryPosition").get("abbreviation")
+            
                         player_list.append(player_dict)
                     except:
                         pass
@@ -68,7 +75,11 @@ class NHLSeasonScraper():
         #reorder columns
         print("2. Feature cleaning/engineering")    
         df = pd.DataFrame(player_list)
-        df = df[['id','name'] + [col for col in df.columns if col not in ['id','name']]]
+        df['C'] = df['position'].apply(lambda k: 1 if k == "C" else 0)
+        df['LW'] = df['position'].apply(lambda k: 1 if k == "LW" else 0)
+        df['RW'] = df['position'].apply(lambda k: 1 if k == "RW" else 0)
+        df['D'] = df['position'].apply(lambda k: 1 if k == "D" else 0)
+        df = df[['id','name', 'position'] + [col for col in df.columns if col not in ['id','name','position']]]
         
         #convert time to floats
         df['powerPlayTimeOnIce'] = df['powerPlayTimeOnIce'].apply(lambda x: time_convert(x))
@@ -144,12 +155,23 @@ class NHLSeasonScraper():
             player_dict = site_json.get("stats")[0].get('splits')[0].get("stat")
             player_dict['id'] = str(player_id_dict[player])
             player_dict['name'] = player
+            
+            url = "https://statsapi.web.nhl.com/api/v1/people/" + str(player_id_dict[player])
+            html = request.urlopen(url).read()
+            soup = BS(html,'html.parser')
+            site_json=json.loads(soup.text)
+            player_dict['position'] = site_json.get('people')[0].get("primaryPosition").get("abbreviation")
+            
             player_list.append(player_dict) 
         
         #reorder columns
         print("4. Feature cleaning/engineering")    
         df = pd.DataFrame(player_list)
-        df = df[['id','name'] + [col for col in df.columns if col not in ['id','name']]]
+        df['C'] = df['position'].apply(lambda k: 1 if k == "C" else 0)
+        df['LW'] = df['position'].apply(lambda k: 1 if k == "LW" else 0)
+        df['RW'] = df['position'].apply(lambda k: 1 if k == "RW" else 0)
+        df['D'] = df['position'].apply(lambda k: 1 if k == "D" else 0)
+        df = df[['id','name','position'] + [col for col in df.columns if col not in ['id','name','position']]]
         
         #convert time to floats
         df['powerPlayTimeOnIce'] = df['powerPlayTimeOnIce'].apply(lambda x: time_convert(x))
@@ -192,8 +214,8 @@ class NHLSeasonScraper():
         
     #save the current Dataframes
     def save_df(self):
-        self.player_data.to_csv("player_data.csv")
-        self.freeagent_data.to_csv("freeagent_data.csv")
+        self.player_data.to_csv("current_data/player_data.csv")
+        self.freeagent_data.to_csv("current_data/freeagent_data.csv")
         
     def __str__(self):
         print("Players")
