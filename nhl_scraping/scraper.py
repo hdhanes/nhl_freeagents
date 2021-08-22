@@ -7,9 +7,12 @@ Hendrix Hanes
 
 import pandas as pd
 from bs4 import BeautifulSoup as BS
+import re
 from urllib import request
 import json
 from googlesearch import search
+from datetime import datetime
+import numpy as np
 
 #helper function: convert %M:%S into a float of time
     #str -> float
@@ -65,6 +68,20 @@ class NHLSeasonScraper():
                         soup = BS(html,'html.parser')
                         site_json=json.loads(soup.text)
                         player_dict['position'] = site_json.get('people')[0].get("primaryPosition").get("abbreviation")
+                        today = datetime.today()
+                        bday = datetime.strptime(site_json.get('people')[0].get('birthDate'), '%Y-%m-%d')
+                        player_dict['age'] = (today - bday).days/365
+                        
+                        #scraping cap hits
+                        url = "https://www.capfriendly.com/players/" + player_dict['name'].replace(" ", "-").lower()
+                        html = request.urlopen(url).read()
+                        soup = BS(html,'html.parser')
+                        cap = soup.find("div",attrs={"class":"c"}, text=re.compile("Cap Hit:"))
+                        dollars = int(cap.string[9:].replace("$","").replace(",",""))
+                        millions = round(dollars/1000000,2)
+                        player_dict['cap'] = "$" + str(millions) + "M"
+                        if round(float(player_dict['cap'][1:-1])) == 0:
+                            player_dict['cap'] = "RFA"
             
                         player_list.append(player_dict)
                     except:
@@ -79,7 +96,9 @@ class NHLSeasonScraper():
         df['LW'] = df['position'].apply(lambda k: 1 if k == "LW" else 0)
         df['RW'] = df['position'].apply(lambda k: 1 if k == "RW" else 0)
         df['D'] = df['position'].apply(lambda k: 1 if k == "D" else 0)
-        df = df[['id','name', 'position'] + [col for col in df.columns if col not in ['id','name','position']]]
+        df['gp'] = df['games']
+        df['rounded_age'] = df['age'].apply(lambda k: round(np.floor(k)))
+        df = df[['id','name', 'position', "rounded_age", "games", 'cap'] + [col for col in df.columns if col not in ['id','name','position', "rounded_age","games",'cap']]]
         
         #convert time to floats
         df['powerPlayTimeOnIce'] = df['powerPlayTimeOnIce'].apply(lambda x: time_convert(x))
@@ -161,6 +180,12 @@ class NHLSeasonScraper():
             soup = BS(html,'html.parser')
             site_json=json.loads(soup.text)
             player_dict['position'] = site_json.get('people')[0].get("primaryPosition").get("abbreviation")
+            today = datetime.today()
+            bday = datetime.strptime(site_json.get('people')[0].get('birthDate'), '%Y-%m-%d')
+            player_dict['age'] = (today - bday).days/365
+            
+            #no cap hit
+            player_dict['cap'] = "UFA"
             
             player_list.append(player_dict) 
         
@@ -171,7 +196,9 @@ class NHLSeasonScraper():
         df['LW'] = df['position'].apply(lambda k: 1 if k == "LW" else 0)
         df['RW'] = df['position'].apply(lambda k: 1 if k == "RW" else 0)
         df['D'] = df['position'].apply(lambda k: 1 if k == "D" else 0)
-        df = df[['id','name','position'] + [col for col in df.columns if col not in ['id','name','position']]]
+        df['gp'] = df['games']
+        df['rounded_age'] = df['age'].apply(lambda k: round(np.floor(k)))
+        df = df[['id','name','position','rounded_age','games','cap'] + [col for col in df.columns if col not in ['id','name','position','rounded_age','games','cap']]]
         
         #convert time to floats
         df['powerPlayTimeOnIce'] = df['powerPlayTimeOnIce'].apply(lambda x: time_convert(x))
@@ -227,9 +254,9 @@ class NHLSeasonScraper():
         
 #testing                      
 if __name__ == '__main__':
-    test = NHLSeasonScraper()
-    test.scraperosters("2021")
-    test.scrapeFA("2021")
-    print(test)
-    test.save_df()
+    data = NHLSeasonScraper()
+    data.scraperosters("2021")
+    data.scrapeFA("2021")
+    print(data)
+    data.save_df()
         
